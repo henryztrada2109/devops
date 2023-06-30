@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "DevOps infrastructure\n"
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Default: prod
+  CidrBlock:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 172.17.0.0/16
+  KeyNameJenkins:
+    Type: String
+  NameAmiJenkins:
+    Type: String
+    Default: ami-03f38e546e3dc59e1
+Resources:
+  NestedStackVPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./vpc.yaml
+      Parameters:
+        ResourcePrefix:
+          Ref: ResourcePrefix
+        CidrBlock:
+          Ref: CidrBlock
+  NestedStackEc2:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./ec2.yaml
+      Parameters:
+        ResourcePrefix:
+          Ref: ResourcePrefix
+        KeyNameJenkins:
+          Ref: KeyNameJenkins
+        NameAmiJenkins:
+          Ref: NameAmiJenkins
+        PublicSubNet1:
+          Fn::Sub: '{{resolve:ssm:/${ResourcePrefix}/vpc/subnet/public/list/0}}'
+        PublicSecurityGroup:
+          Fn::Sub: '{{resolve:ssm:/${ResourcePrefix}/vpc/securityGroup/public}}'

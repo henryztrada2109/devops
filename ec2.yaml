@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  Deploys EC2 DevOps
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+  KeyNameJenkins:
+    Type: String
+  NameAmiJenkins:
+    Type: String
+    Default: "ami-03f38e546e3dc59e1"
+  PublicSubNet1:
+    Type: String
+  PublicSecurityGroup:
+    Type: String
+
+Resources:
+  EC2Jenkins:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName:
+        Ref: "KeyNameJenkins"
+      ImageId:
+        Ref: "NameAmiJenkins"
+      InstanceType: "t2.micro"
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - Ref: "PublicSecurityGroup"
+          SubnetId:
+            Ref: "PublicSubNet1"
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourcePrefix} Ec2 Jenkins
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo yum update -y
+          sudo yum install docker -y
+          sudo service docker start
+          sudo usermod -a -G docker ec2-user
+          sudo docker run -d -p 80:8080 -p 50000:50000 --name jenkins --restart=on-failure jenkins/jenkins:lts-jdk11
