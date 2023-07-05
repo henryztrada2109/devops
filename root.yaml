@@ -26,7 +26,24 @@ Parameters:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
     Default: 172.17.0.0/16
+  BucketOriginBaseDomainName:
+    Type: String
+    Default: heztrada.com
+  AcmCertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:337928833886:certificate/5018ed67-eee7-499d-ab1f-f82218626838
 Resources:
+  NestedStackWeb:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./web.yaml
+      Parameters:
+        ResourcePrefix:
+          Ref: ResourcePrefix
+        BucketOriginBaseDomainName:
+          Ref: BucketOriginBaseDomainName
+        AcmCertificateArn:
+          Ref: AcmCertificateArn
   NestedStackVPC:
     Type: AWS::CloudFormation::Stack
     Properties:

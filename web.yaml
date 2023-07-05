@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  This template deploys Cloudfront distribution for Web Sites
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+  BucketOriginBaseDomainName:
+    Type: String
+  AcmCertificateArn:
+    Type: String
+
+Resources:
+
+  PortalSiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'profile-page-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: FALSE
+        BlockPublicPolicy: FALSE
+        IgnorePublicAcls: FALSE
+        RestrictPublicBuckets: FALSE
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      CorsConfiguration:
+        CorsRules:
+          -
+            AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - 'GET'
+            AllowedOrigins:
+              - !Sub 'api.${BucketOriginBaseDomainName}'
+
+  PortalBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PortalSiteBucket
+      PolicyDocument:
+        Id: PortalDelBucketPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PortalPublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    Ref: "PortalSiteBucket"
+                  - "/*"
+
+  PortalOriginIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: 'Identity for Portal on s3'
+
+  PortalDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn: PortalSiteBucket
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Sub '${BucketOriginBaseDomainName}'
+        Comment: ''
+        DefaultRootObject: 'index.html'
+        DefaultCacheBehavior:
+          CachedMethods:
+            - HEAD
+            - GET
+          AllowedMethods:
+            - HEAD
+            - DELETE
+            - POST
+            - GET
+            - OPTIONS
+            - PUT
+            - PATCH
+          Compress: true
+          DefaultTTL: 86400
+          FieldLevelEncryptionId: ''
+          ForwardedValues:
+            Cookies:
+              Forward: none
+            Headers:
+              - Origin
+              - Access-Control-Request-Method
+              - Access-Control-Request-Headers
+            QueryString: false
+          MaxTTL: 31536000
+          MinTTL: 0
+          SmoothStreaming: false
+          TargetOriginId: !Ref PortalSiteBucket
+          ViewerProtocolPolicy: redirect-to-https
+        CustomErrorResponses:
+          - ErrorCode: '404'
+            ResponsePagePath: "/index.html"
+            ResponseCode: '200'
+            ErrorCachingMinTTL: '30'
+          - ErrorCode: '400'
+            ResponsePagePath: "/index.html"
+            ResponseCode: '200'
+            ErrorCachingMinTTL: '30'
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        Origins:
+          - DomainName: !GetAtt PortalSiteBucket.RegionalDomainName
+            Id: !Ref PortalSiteBucket
+            OriginPath: ''
+            S3OriginConfig:
+              OriginAccessIdentity: !Join ['', ['origin-access-identity/cloudfront/', !Ref PortalOriginIdentity]]
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          AcmCertificateArn:  !Sub '${AcmCertificateArn}'
+          MinimumProtocolVersion: TLSv1.2_2018
+          SslSupportMethod: sni-only
