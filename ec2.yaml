@@ -11,25 +11,63 @@ Parameters:
   NameAmiJenkins:
     Type: String
     Default: "ami-03f38e546e3dc59e1"
+  InstanceTypeJenkins:
+    Type: String
+    Default: "t2.medium"
+  KeyNameSonarQube:
+    Type: String
+  NameAmiSonarQube:
+    Type: String
+    Default: "ami-03f38e546e3dc59e1"
+  InstanceTypeSonarQube:
+    Type: String
+    Default: "t2.medium"
   PublicSubNet1:
     Type: String
-  PublicSecurityGroup:
+  Vpc:
+    Type: String
+  HostedZoneId:
     Type: String
 
 Resources:
-  EC2Jenkins:
+  # Jenkins
+  JenkinsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupName: !Sub "${ResourcePrefix} SG EC2 Public"
+      GroupDescription: !Sub "${ResourcePrefix} SG EC2 Public"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: 50000
+          ToPort: 50000
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourcePrefix} SG EC2 Public"
+
+  JenkinsEc2:
     Type: AWS::EC2::Instance
     Properties:
       KeyName:
         Ref: "KeyNameJenkins"
       ImageId:
         Ref: "NameAmiJenkins"
-      InstanceType: "t2.micro"
+      InstanceType:
+        Ref: "InstanceTypeJenkins"
       NetworkInterfaces:
         - AssociatePublicIpAddress: "true"
           DeviceIndex: "0"
           GroupSet:
-            - Ref: "PublicSecurityGroup"
+            - Ref: "JenkinsSecurityGroup"
           SubnetId:
             Ref: "PublicSubNet1"
       Tags:
@@ -43,3 +81,75 @@ Resources:
           sudo service docker start
           sudo usermod -a -G docker ec2-user
           sudo docker run -d -p 80:8080 -p 50000:50000 --name jenkins --restart=on-failure jenkins/jenkins:lts-jdk11
+
+  JenkinsDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Ref: "HostedZoneId"
+      Comment: DNS name for my instance of Jenkins.
+      Name: 'jenkins.heztrada.com'
+      Type: A
+      TTL: 300
+      ResourceRecords:
+        - !GetAtt JenkinsEc2.PublicIp
+
+  # Sonar Qube
+  SonarQubeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupName: !Sub "${ResourcePrefix} SG EC2 Public SonarQube"
+      GroupDescription: !Sub "${ResourcePrefix} SG EC2 Public SonarQube"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourcePrefix} SG EC2 Public SonarQube"
+
+  SonarQubeEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName:
+        Ref: "KeyNameSonarQube"
+      ImageId:
+        Ref: "NameAmiSonarQube"
+      InstanceType:
+        Ref: "InstanceTypeSonarQube"
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - Ref: "SonarQubeSecurityGroup"
+          SubnetId:
+            Ref: "PublicSubNet1"
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourcePrefix} Ec2 SonarQube
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo yum update -y
+          sudo yum install docker -y
+          sudo service docker start
+          sudo usermod -a -G docker ec2-user
+          sudo docker run -d -p 80:9000 sonarqube
+
+  SonarQubeDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Ref: "HostedZoneId"
+      Comment: DNS name for my instance of SonarQube.
+      Name: 'sonarqube.heztrada.com'
+      Type: A
+      TTL: 300
+      ResourceRecords:
+        - !GetAtt SonarQubeEC2.PublicIp

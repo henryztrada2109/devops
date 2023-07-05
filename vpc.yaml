@@ -16,7 +16,6 @@ Parameters:
     Type: String
     Default: 172.17.0.0/16
 
-
 Resources:
 
   VPC:
@@ -97,24 +96,13 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet2
 
-  Ec2SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+  VpcParameter:
+    Type: AWS::SSM::Parameter
     Properties:
-      VpcId: !Ref VPC
-      GroupName: !Sub "${ResourcePrefix} SG EC2 Public"
-      GroupDescription: !Sub "${ResourcePrefix} SG EC2 Public"
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: '0.0.0.0/0'
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: '0.0.0.0/0'
-      Tags:
-        - Key: Name
-          Value: !Sub "${ResourcePrefix} SG EC2 Public"
+      Name: !Sub "/${ResourcePrefix}/vpc"
+      Type: String
+      Description: A vpc
+      Value: !Ref VPC
 
   PublicSubnetsParameter:
     Type: AWS::SSM::Parameter
@@ -140,10 +128,21 @@ Resources:
       Description: A list of the public subnets
       Value: !Ref PublicSubnet2
 
-  Ec2SecurityGroupParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub "/${ResourcePrefix}/vpc/securityGroup/public"
-      Type: String
-      Description: A security group attachment to vpc for network public
-      Value: !Ref Ec2SecurityGroup
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPC"
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1"
+
+  PublicSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet2"
